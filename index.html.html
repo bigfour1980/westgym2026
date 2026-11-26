@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>WESTGYM - 野球自主練サポートアプリ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background: radial-gradient(circle at top, #102a43 0%, #091524 60%, #060d17 100%);
+            color: #f8fafc;
+        }
+        .btn-press {
+            transition: transform 0.1s ease, filter 0.15s ease;
+        }
+        .btn-press:active {
+            transform: scale(0.96);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-20 selection:bg-emerald-500 selection:text-white">
+
+    <!-- チーム限定公開：合言葉ロック画面 -->
+    <div id="passcode-overlay" class="fixed inset-0 z-[100] bg-[#060d17] flex items-center justify-center p-5">
+        <div class="max-w-xs w-full bg-[#0e2238] border border-sky-400/30 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center text-emerald-400 text-2xl">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <div>
+                <span class="text-[10px] font-black tracking-widest uppercase text-amber-400 bg-amber-500/15 px-2.5 py-0.5 rounded-full">MEMBERS ONLY</span>
+                <h2 class="text-lg font-black text-white mt-2">WESTGYM チーム限定</h2>
+                <p class="text-xs text-slate-300 mt-1">チームで決めた合言葉を入力してください</p>
+            </div>
+            <form id="passcode-form" onsubmit="return checkPasscodeSubmit(event)" class="space-y-3">
+                <div class="relative">
+                    <input type="password" id="passcode-input" required placeholder="合言葉を入力" autocomplete="off" autocapitalize="none" autocorrect="off"
+                           class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-400 focus:outline-none text-white text-center text-base font-black tracking-widest rounded-xl px-10 py-3">
+                    <button type="button" onclick="togglePasscodeVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm" title="入力文字を表示">
+                        <i id="passcode-eye-icon" class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+                <p id="passcode-error" class="text-xs font-bold text-rose-400 hidden">合言葉が違います。もう一度確認してください。</p>
+                <button type="submit" class="btn-press w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-xl text-sm shadow-lg">
+                    ロックを解除して開く
+                </button>
+            </form>
+            <p class="text-[10px] text-slate-400">※一度入力するとこの端末に記憶されます</p>
+        </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 border border-emerald-400/50 text-white text-xs font-black px-4 py-2.5 rounded-full shadow-xl pointer-events-none opacity-0 transition-opacity duration-300 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-msg">完了しました！</span>
+    </div>
+
+    <!-- ヘッダー -->
+    <header class="max-w-md w-full mx-auto px-3.5 pt-3.5 pb-2 space-y-2.5">
+        <div class="flex items-center justify-between gap-2 text-xs font-extrabold">
+            <span class="bg-[#12263a] border border-slate-700 rounded-full px-3 py-1 text-slate-200 flex items-center gap-1.5">
+                <i class="fa-regular fa-calendar text-slate-400"></i>
+                <span id="top-date-chip">11月26日(木)</span>
+            </span>
+            <span class="bg-rose-950/90 border border-rose-500/40 rounded-full px-3 py-1 text-white flex items-center gap-1">
+                <i class="fa-solid fa-fire text-amber-400"></i> 連続 <span id="streak-days" class="text-amber-300">0</span>日
+            </span>
+            <span class="bg-[#12263a] border border-amber-500/40 rounded-full px-3 py-1 text-amber-300 flex items-center gap-1">
+                <span class="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center">P</span>
+                <span id="total-points-display">0</span>
+            </span>
+        </div>
+
+        <!-- レベルバー -->
+        <div>
+            <div class="flex items-baseline justify-between text-xs font-black mb-1">
+                <span class="text-white">Lv.<span id="player-level" class="text-base ml-0.5">1</span></span>
+                <span class="text-[11px] text-slate-300 font-bold">次のレベルまで あと <span id="remain-exp" class="text-amber-300">1000</span>pt</span>
+            </div>
+            <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div id="exp-bar" class="h-full rounded-full bg-gradient-to-r from-amber-300 to-emerald-400 transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 選手プロフィール＆称号カード -->
+        <div class="bg-[#132a42] border border-sky-400/20 rounded-2xl p-3 flex items-center justify-between gap-3 shadow">
+            <div class="flex items-center gap-3 min-w-0">
+                <button type="button" onclick="openAvatarModal()" class="w-11 h-11 rounded-2xl bg-slate-900 border border-amber-400/50 flex items-center justify-center text-amber-400 overflow-hidden shrink-0" title="写真を変更">
+                    <img id="header-avatar-img" src="" alt="" class="w-full h-full object-cover hidden">
+                    <i id="header-avatar-icon" class="fa-solid fa-camera text-base"></i>
+                </button>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span id="header-player-name" class="text-base font-black text-white">プレイヤー</span>
+                        <span class="text-xs font-black text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-md">
+                            <i class="fa-solid fa-trophy mr-0.5"></i><span id="player-title">ベンチ入り候補</span>
+                        </span>
+                    </div>
+                    <div id="header-sub-badges" class="flex items-center gap-1.5 flex-wrap mt-1">
+                        <span id="header-grade-pos-badge" class="text-[10px] font-extrabold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded hidden"></span>
+                        <span id="header-team-badge" class="text-[10px] font-bold text-sky-300 hidden"></span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 mt-0.5 truncate">
+                        次の称号「<span id="next-title-name" class="text-white font-bold">熱血チャレンジャー</span>」まで あと<span id="next-title-pt" class="text-amber-300 font-bold">1000</span>pt
+                    </p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 max-w-md w-full mx-auto px-3.5 space-y-3.5">
+
+        <!-- 1. ホーム画面（今日の達成率 ＋ 今日の練習） -->
+        <section id="section-menu" class="space-y-3.5">
+            <!-- 今日の達成率 -->
+            <div class="bg-[#0e2238] border border-sky-400/20 rounded-2xl p-4 shadow-lg flex items-center gap-4">
+                <div class="relative w-24 h-24 shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+                        <circle cx="60" cy="60" r="50" fill="#081626" stroke="#1e3a5f" stroke-width="10"></circle>
+                        <circle id="ring-progress-circle" cx="60" cy="60" r="50" fill="none" stroke="#38bdf8" stroke-width="10" stroke-linecap="round"
+                                stroke-dasharray="314.16" stroke-dashoffset="314.16" class="transition-all duration-500"></circle>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                        <span class="text-[9px] font-bold text-slate-300">達成率</span>
+                        <span class="text-2xl font-black text-white leading-none mt-0.5"><span id="ring-percent-num">0</span><span class="text-xs">%</span></span>
+                    </div>
+                </div>
+
+                <div id="summary-check-grid" class="flex-1 grid grid-cols-2 gap-x-2 gap-y-2 text-xs font-bold">
+                    <!-- JS自動描画 -->
+                </div>
+            </div>
+
+            <!-- 今日の練習カード -->
+            <div class="rounded-2xl overflow-hidden shadow-xl bg-white text-slate-900">
+                <div class="bg-[#16385c] px-4 py-2.5 flex items-center justify-between text-white">
+                    <h2 class="text-sm font-black flex items-center gap-2">
+                        <i class="fa-solid fa-bullseye text-amber-300"></i> 今日の練習（タップでやり方説明）
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="openAddDrillModal()" class="text-xs font-extrabold bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-2.5 py-1 rounded-lg">
+                            + 追加
+                        </button>
+                        <button type="button" onclick="resetDailyDrills()" class="text-xs bg-white/15 hover:bg-white/25 px-2 py-1 rounded-lg" title="今日の数値を0に戻す">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="today-drills-list" class="divide-y divide-slate-200">
+                    <!-- JS自動描画 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 記録・タイマー・体格タブ -->
+        <section id="section-log" class="hidden space-y-3.5">
+            <!-- クイックタイマー -->
+            <div class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-black text-white flex items-center gap-2">
+                        <i class="fa-solid fa-stopwatch text-amber-400"></i> タイマー（プランク・体幹）
+                    </h2>
+                    <span id="timer-phase" class="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">準備OK</span>
+                </div>
+                <div class="flex items-center justify-between bg-slate-950/80 rounded-xl px-4 py-3 border border-slate-800">
+                    <div>
+                        <div id="timer-display" class="text-4xl font-black text-white">00:30</div>
+                        <div id="timer-set-info" class="text-[11px] text-slate-400 font-bold">1 / 3セット（30秒運動・15秒休憩）</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="toggleTimer()" id="timer-start-btn" class="btn-press bg-emerald-600 text-white font-black px-4 py-2.5 rounded-xl text-xs">スタート</button>
+                        <button type="button" onclick="resetTimer()" class="btn-press bg-slate-800 text-slate-300 font-bold px-3 py-2.5 rounded-xl text-xs">戻す</button>
+                    </div>
+                </div>
+                <div class="hidden">
+                    <input type="number" id="work-sec" value="30">
+                    <input type="number" id="rest-sec" value="15">
+                    <input type="number" id="total-sets" value="3">
+                </div>
+            </div>
+
+            <!-- 身長・体重 -->
+            <div class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-black text-white flex items-center gap-2">
+                        <i class="fa-solid fa-ruler-vertical text-sky-400"></i> 身長・体重
+                    </h2>
+                    <span id="body-latest-summary" class="text-xs font-bold text-emerald-400">未記録</span>
+                </div>
+                <form id="body-form" class="flex gap-2">
+                    <input type="number" step="0.1" id="body-height" placeholder="身長 cm" class="w-1/3 bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-2">
+                    <input type="number" step="0.1" id="body-weight" placeholder="体重 kg" class="w-1/3 bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-2">
+                    <button type="submit" class="w-1/3 btn-press bg-sky-600 text-white font-black rounded-xl text-xs py-2">記録 (+15pt)</button>
+                </form>
+                <div id="body-history-list" class="space-y-1.5"></div>
+            </div>
+
+            <!-- 今週・今月の目標 -->
+            <div class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-2.5">
+                <h2 class="text-sm font-black text-white flex items-center gap-2">
+                    <i class="fa-solid fa-flag text-amber-400"></i> 今週・今月の目標
+                </h2>
+                <div class="space-y-2">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[11px] font-black text-sky-400 w-10 shrink-0">今週</span>
+                        <input type="text" id="weekly-goal-input" placeholder="例：素振り500本" class="flex-1 bg-slate-900 border border-slate-700 text-white text-xs rounded-lg px-2.5 py-1.5">
+                        <button type="button" onclick="savePeriodGoal('weekly')" class="bg-slate-800 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg">保存</button>
+                        <button type="button" onclick="togglePeriodGoal('weekly')" id="weekly-goal-check" class="text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-300">未達成</button>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[11px] font-black text-amber-400 w-10 shrink-0">今月</span>
+                        <input type="text" id="monthly-goal-input" placeholder="例：ご飯をしっかり食べて体重+1kg" class="flex-1 bg-slate-900 border border-slate-700 text-white text-xs rounded-lg px-2.5 py-1.5">
+                        <button type="button" onclick="savePeriodGoal('monthly')" class="bg-slate-800 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg">保存</button>
+                        <button type="button" onclick="togglePeriodGoal('monthly')" id="monthly-goal-check" class="text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-300">未達成</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 野球ノート -->
+            <form id="log-form" class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-2.5">
+                <h2 class="text-sm font-black text-white flex items-center gap-2">
+                    <i class="fa-solid fa-pen text-emerald-400"></i> 野球ノート
+                </h2>
+                <select id="log-condition" class="w-full bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-2">
+                    <option value="絶好調！">体調：絶好調！</option>
+                    <option value="元気いっぱい">体調：元気いっぱい</option>
+                    <option value="少し疲れあり">体調：少し疲れあり</option>
+                </select>
+                <textarea id="log-note" rows="2" required placeholder="今日頑張ったことや気づいたことを書こう" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5"></textarea>
+                <button type="submit" class="btn-press w-full bg-emerald-600 text-white font-black py-2 rounded-xl text-xs">ノートを保存 (+20pt)</button>
+            </form>
+            <div id="log-list" class="space-y-2"></div>
+        </section>
+
+        <!-- 3. ランキング・共有タブ -->
+        <section id="section-social" class="hidden space-y-3.5">
+            <!-- プロフィール設定（名前・学年・ポジション・チーム名） -->
+            <div class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-black text-white">プロフィール設定</h2>
+                    <button type="button" onclick="openAvatarModal()" class="text-xs font-bold text-amber-400">
+                        <i class="fa-solid fa-camera"></i> アイコン変更
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">名前</label>
+                        <input type="text" id="player-name-input" maxlength="16" placeholder="名前（例：りょう）" class="w-full bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">チーム名</label>
+                        <input type="text" id="team-name-input" maxlength="20" placeholder="チーム名" class="w-full bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-2">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">学年</label>
+                        <select id="player-grade-select" class="w-full bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-2">
+                            <option value="">学年を選択</option>
+                            <option value="小学1年">小学1年</option>
+                            <option value="小学2年">小学2年</option>
+                            <option value="小学3年">小学3年</option>
+                            <option value="小学4年">小学4年</option>
+                            <option value="小学5年">小学5年</option>
+                            <option value="小学6年">小学6年</option>
+                            <option value="中学生以上">中学生以上</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">ポジション</label>
+                        <select id="player-position-select" class="w-full bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-2">
+                            <option value="">ポジションを選択</option>
+                            <option value="ピッチャー（投手）">ピッチャー（投手）</option>
+                            <option value="キャッチャー（捕手）">キャッチャー（捕手）</option>
+                            <option value="ファースト（一塁）">ファースト（一塁）</option>
+                            <option value="セカンド（二塁）">セカンド（二塁）</option>
+                            <option value="サード（三塁）">サード（三塁）</option>
+                            <option value="ショート（遊撃）">ショート（遊撃）</option>
+                            <option value="レフト（左翼）">レフト（左翼）</option>
+                            <option value="センター（中堅）">センター（中堅）</option>
+                            <option value="ライト（右翼）">ライト（右翼）</option>
+                            <option value="全ポジション">全ポジション</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="button" onclick="savePlayerProfile()" class="btn-press w-full bg-emerald-600 text-white text-xs font-black py-2.5 rounded-xl">プロフィールを保存する</button>
+            </div>
+
+            <!-- ランキング -->
+            <div class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-2.5">
+                <h2 class="text-sm font-black text-white flex items-center gap-2">
+                    <i class="fa-solid fa-ranking-star text-amber-400"></i> ランキング
+                </h2>
+                <div id="leaderboard-list" class="space-y-2"></div>
+            </div>
+
+            <!-- 参加メンバーのログイン状態・履歴 -->
+            <div class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-black text-white flex items-center gap-2">
+                        <i class="fa-solid fa-users text-emerald-400"></i> 参加メンバーのログイン状態
+                    </h2>
+                    <span id="member-login-count" class="text-[11px] font-bold text-emerald-400">0人確認</span>
+                </div>
+                <div id="member-login-list" class="space-y-2"></div>
+            </div>
+
+            <!-- 練習内容の共有 -->
+            <div class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-black text-white flex items-center gap-2">
+                        <i class="fa-solid fa-share-nodes text-sky-400"></i> 練習をみんなに共有
+                    </h2>
+                    <button type="button" onclick="fillShareFromToday()" class="text-xs font-bold text-emerald-400">今日の練習を入力</button>
+                </div>
+                <textarea id="share-text-input" rows="2" placeholder="今日頑張った練習をみんなに共有しよう" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5"></textarea>
+                <button type="button" onclick="submitSharedPost()" class="btn-press w-full bg-sky-600 text-white font-black py-2 rounded-xl text-xs">投稿する (+10pt)</button>
+                <div id="shared-feed-list" class="space-y-2"></div>
+            </div>
+
+            <!-- 獲得バッジ一覧 -->
+            <div class="bg-[#0e2238] border border-slate-700 rounded-2xl p-4 space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-black text-white flex items-center gap-2">
+                        <i class="fa-solid fa-medal text-amber-400"></i> 獲得バッジ
+                    </h2>
+                    <span id="badge-count-display" class="text-xs font-bold text-amber-400">0 / 8</span>
+                </div>
+                <div id="badge-grid" class="grid grid-cols-4 gap-2"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 3タブボトムナビ -->
+    <nav class="fixed bottom-0 inset-x-0 bg-[#081320]/95 backdrop-blur border-t border-slate-800 z-30">
+        <div class="max-w-md mx-auto grid grid-cols-3 py-2">
+            <button type="button" onclick="switchTab('menu')" id="tab-menu" class="tab-btn text-emerald-400 flex flex-col items-center justify-center text-xs font-black">
+                <i class="fa-solid fa-house text-base mb-0.5"></i><span>今日の練習</span>
+            </button>
+            <button type="button" onclick="switchTab('log')" id="tab-log" class="tab-btn text-slate-400 flex flex-col items-center justify-center text-xs font-bold">
+                <i class="fa-solid fa-book text-base mb-0.5"></i><span>記録・タイマー</span>
+            </button>
+            <button type="button" onclick="switchTab('social')" id="tab-social" class="tab-btn text-slate-400 flex flex-col items-center justify-center text-xs font-bold">
+                <i class="fa-solid fa-trophy text-base mb-0.5"></i><span>ランキング・共有</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 種目詳細・やり方説明モーダル（アニメーションなし・説明のみ） -->
+    <div id="drill-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#0f2338] border border-slate-700 rounded-2xl max-w-sm w-full p-4 space-y-3 shadow-2xl">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 id="drill-modal-title" class="text-base font-black text-white">素振り</h3>
+                    <p id="drill-modal-progress-label" class="text-xs font-bold text-emerald-400">0 / 100回 (0%)</p>
+                </div>
+                <button type="button" onclick="closeDrillModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="bg-slate-950/85 border border-sky-500/25 rounded-xl p-3 space-y-1">
+                <div class="text-[11px] font-black text-sky-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-info"></i> やり方のポイント
+                </div>
+                <p id="drill-modal-desc" class="text-xs text-slate-100 leading-relaxed"></p>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <button type="button" onclick="incrementActiveDrill(1)" class="btn-press bg-emerald-600 text-white font-black py-2.5 rounded-xl text-sm">+1</button>
+                <button type="button" onclick="incrementActiveDrill(10)" class="btn-press bg-slate-800 text-white font-black py-2.5 rounded-xl text-sm">+10</button>
+                <button type="button" onclick="incrementActiveDrill(30)" class="btn-press bg-slate-800 text-white font-black py-2.5 rounded-xl text-sm">+30</button>
+            </div>
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-slate-400">目標:</span>
+                    <input type="number" id="drill-target-input" min="1" class="w-16 bg-slate-900 border border-slate-700 text-white font-black text-center rounded-lg py-1">
+                    <span id="drill-unit-label" class="text-slate-400">回</span>
+                    <button type="button" onclick="saveDrillTarget()" class="bg-sky-600 text-white font-bold px-2.5 py-1 rounded-lg">変更</button>
+                </div>
+                <button type="button" onclick="resetSingleDrill()" class="text-rose-400 font-bold">0に戻す</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新規種目追加モーダル -->
+    <div id="add-drill-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <form id="add-drill-form" class="bg-[#0f2338] border border-slate-700 rounded-2xl max-w-sm w-full p-4 space-y-3 shadow-2xl">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-black text-white">練習メニューを追加</h3>
+                <button type="button" onclick="closeAddDrillModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <input type="text" id="new-drill-name" required placeholder="メニュー名（例：ティー打撃、キャッチボール）" class="w-full bg-slate-900 border border-slate-700 text-white font-bold rounded-xl px-3 py-2">
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="number" id="new-drill-target" min="1" value="30" required class="bg-slate-900 border border-slate-700 text-white font-bold rounded-xl px-3 py-2">
+                    <select id="new-drill-unit" class="bg-slate-900 border border-slate-700 text-white font-bold rounded-xl px-2 py-2">
+                        <option value="回">回</option>
+                        <option value="球">球</option>
+                        <option value="秒">秒</option>
+                        <option value="分">分</option>
+                    </select>
+                    <select id="new-drill-cat" class="bg-slate-900 border border-slate-700 text-white font-bold rounded-xl px-2 py-2">
+                        <option value="打撃">バッティング</option>
+                        <option value="投球">ピッチング</option>
+                        <option value="守備・走塁">守備・走塁</option>
+                        <option value="フィジカル">体力づくり</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-press w-full bg-emerald-600 text-white font-black py-2.5 rounded-xl text-xs">追加する</button>
+        </form>
+    </div>
+
+    <!-- アイコン写真・カメラ変更モーダル -->
+    <div id="avatar-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#0f2338] border border-slate-700 rounded-2xl max-w-xs w-full p-4 space-y-3 text-center shadow-2xl">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-black text-white">アイコン写真設定</h3>
+                <button type="button" onclick="closeAvatarModal()" class="w-7 h-7 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="w-20 h-20 mx-auto rounded-2xl bg-slate-900 border border-amber-400/50 flex items-center justify-center overflow-hidden">
+                <img id="modal-avatar-preview" src="" alt="" class="w-full h-full object-cover hidden">
+                <i id="modal-avatar-icon" class="fa-solid fa-user text-2xl text-amber-400"></i>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <label class="btn-press cursor-pointer bg-sky-600 text-white font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-camera"></i> カメラ撮影
+                    <input type="file" accept="image/*" capture="user" onchange="handleAvatarFileSelect(event)" class="hidden">
+                </label>
+                <label class="btn-press cursor-pointer bg-emerald-600 text-white font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-image"></i> 写真選択
+                    <input type="file" accept="image/*" onchange="handleAvatarFileSelect(event)" class="hidden">
+                </label>
+            </div>
+            <button type="button" onclick="resetAvatarPhoto()" class="text-xs text-slate-400 hover:text-rose-400 font-bold">初期アイコンに戻す</button>
+        </div>
+    </div>
+
+    <script>
+        // --- チーム限定公開：合言葉認証設定 ---
+        const TEAM_PASSCODE = 'west2026';
+        const PASSCODE_STORAGE_KEY = 'westgym_team_unlocked_v1';
+
+        function safeStorageGet(key, fallback = null) {
+            try {
+                const v = localStorage.getItem(key);
+                return v !== null ? v : fallback;
+            } catch (e) {
+                return fallback;
+            }
+        }
+        function safeStorageSet(key, val) {
+            try {
+                localStorage.setItem(key, val);
+            } catch (e) {}
+        }
+
+        // 即時チェック：すでに認証済みなら画面表示と同時にロック解除
+        (function immediatePasscodeCheck() {
+            const saved = safeStorageGet(PASSCODE_STORAGE_KEY, '');
+            if (saved && saved.toLowerCase() === TEAM_PASSCODE.toLowerCase()) {
+                const overlay = document.getElementById('passcode-overlay');
+                if (overlay) overlay.classList.add('hidden');
+            }
+        })();
+
+        function togglePasscodeVisibility() {
+            const input = document.getElementById('passcode-input');
+            const icon = document.getElementById('passcode-eye-icon');
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye';
+            }
+        }
+
+        function checkPasscodeSubmit(e) {
+            if (e) e.preventDefault();
+            const overlay = document.getElementById('passcode-overlay');
+            const input = document.getElementById('passcode-input');
+            const errorEl = document.getElementById('passcode-error');
+            if (!overlay || !input) return false;
+
+            const normalized = input.value
+                .replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                .trim()
+                .toLowerCase();
+
+            if (normalized === TEAM_PASSCODE.toLowerCase()) {
+                safeStorageSet(PASSCODE_STORAGE_KEY, TEAM_PASSCODE);
+                overlay.classList.add('hidden');
+                if (errorEl) errorEl.classList.add('hidden');
+                recordCurrentUserLogin();
+                playSuccessSound();
+                showToast('ロック解除！ようこそ WESTGYM へ');
+            } else {
+                if (errorEl) errorEl.classList.remove('hidden');
+                playTone(220, 0.15, 'sawtooth', 0.06);
+                input.value = '';
+                input.focus();
+            }
+            return false;
+        }
+
+        function safeJsonParse(raw, fallback) {
+            if (!raw) return fallback;
+            try {
+                const parsed = JSON.parse(raw);
+                return parsed !== null && parsed !== undefined ? parsed : fallback;
+            } catch (e) {
+                return fallback;
+            }
+        }
+        function escapeHTML(str) {
+            if (typeof str !== 'string') return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // --- 効果音 ---
+        let audioCtx = null;
+        function playTone(freq, duration = 0.08, type = 'sine', gainVal = 0.06) {
+            try {
+                if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (!audioCtx) return;
+                if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+        function playPopSound() { playTone(540, 0.06, 'sine', 0.05); }
+        function playSuccessSound() {
+            playTone(587.33, 0.1, 'triangle', 0.08);
+            setTimeout(() => playTone(880, 0.18, 'triangle', 0.08), 90);
+        }
+        function playBeep(high = false) { playTone(high ? 880 : 440, high ? 0.25 : 0.12, 'sine', 0.08); }
+
+        // --- 初期7種目データ（小学生向け説明・すべて0スタート） ---
+        const defaultDrills = [
+            { id: 'swing', name: '素振り', current: 0, target: 100, unit: '回', category: '打撃', icon: 'fa-baseball-bat-ball', desc: '足は肩幅より少し広く開き、ボールをよく見るつもりでまっすぐ強くバットを振ろう。1回ずつ丁寧に！' },
+            { id: 'squat', name: 'スクワット', current: 0, target: 30, unit: '回', category: 'フィジカル', icon: 'fa-dumbbell', desc: 'お尻を後ろに引きながら、膝がつま先より前に出すぎないようにゆっくりしゃがんで立ち上がろう。' },
+            { id: 'pushup', name: '腕立て伏せ', current: 0, target: 20, unit: '回', category: 'フィジカル', icon: 'fa-dumbbell', desc: '頭からかかとまでまっすぐ伸ばしたまま、胸が床に近づくまでゆっくり下げて力強く押し上げよう。' },
+            { id: 'situp', name: '腹筋', current: 0, target: 20, unit: '回', category: 'フィジカル', icon: 'fa-dumbbell', desc: '膝を立てて寝転び、おへそを覗き込むように上半身を起こして、お腹の筋肉をしっかり使おう。' },
+            { id: 'plank', name: 'プランク', current: 0, target: 30, unit: '秒', category: 'フィジカル', icon: 'fa-person-praying', desc: '肩の真下に肘をつき、お尻が上がったり下がったりしないように体全体を一直線にキープしよう。' },
+            { id: 'hip', name: '股関節', current: 0, target: 3, unit: '分', category: '守備・走塁', icon: 'fa-heart-pulse', desc: 'お相撲さんの「四股踏み」のように腰を低く落として、股関節をゆっくり大きく伸ばそう。守備や投球の土台になるよ！' },
+            { id: 'stretch', name: 'ストレッチ', current: 0, target: 5, unit: '分', category: 'フィジカル', icon: 'fa-person-walking', desc: '肩・腕・太もも・ふくらはぎを痛気持ちいいところまでゆっくり20秒ずつ伸ばして、ケガを防ごう。' }
+        ];
+
+        // --- アプリ状態（新規配布用リセットキー v4） ---
+        let drills = safeJsonParse(safeStorageGet('westgym_v4_drills'), defaultDrills);
+        if (!Array.isArray(drills) || drills.length === 0) drills = defaultDrills;
+
+        let playerStats = safeJsonParse(safeStorageGet('westgym_v4_stats'), {
+            level: 1,
+            exp: 0,
+            points: 0,
+            streak: 0
+        });
+
+        let playerName = safeStorageGet('westgym_v4_player_name', 'プレイヤー') || 'プレイヤー';
+        let teamName = safeStorageGet('westgym_v4_team_name', '') || '';
+        let playerGrade = safeStorageGet('westgym_v4_player_grade', '') || '';
+        let playerPosition = safeStorageGet('westgym_v4_player_position', '') || '';
+        let playerAvatar = safeStorageGet('westgym_v4_player_avatar', '') || '';
+        let activeDrillId = null;
+
+        let logs = safeJsonParse(safeStorageGet('westgym_v4_logs'), []);
+        if (!Array.isArray(logs)) logs = [];
+
+        let periodGoals = safeJsonParse(safeStorageGet('westgym_v4_period_goals'), {
+            weekly: { text: '', completed: false },
+            monthly: { text: '', completed: false }
+        });
+
+        let bodyRecords = safeJsonParse(safeStorageGet('westgym_v4_body_records'), []);
+        if (!Array.isArray(bodyRecords)) bodyRecords = [];
+
+        let unlockedBadges = safeJsonParse(safeStorageGet('westgym_v4_badges'), []);
+        if (!Array.isArray(unlockedBadges)) unlockedBadges = [];
+
+        let sharedPosts = safeJsonParse(safeStorageGet('westgym_v4_shared_posts'), [
+            { id: 1, author: 'はると（小学6年・ピッチャー）', title: '全国大会レベル', text: 'シャドーピッチング40球と股関節ストレッチ完了！バランスよく立てるようになってきた！', time: '2時間前', likes: 5, liked: false }
+        ]);
+        if (!Array.isArray(sharedPosts)) sharedPosts = [];
+
+        // --- 参加メンバーのログイン履歴管理 ---
+        const defaultMemberLogins = [
+            {
+                id: 'member_haruto',
+                name: 'はると（小学6年・ピッチャー）',
+                team: 'ウエストジュニア',
+                isMe: false,
+                lastLoginAt: Date.now() - 25 * 60 * 1000,
+                loginCount: 18
+            },
+            {
+                id: 'member_kento',
+                name: 'けんと（小学5年・ショート）',
+                team: 'ウエストジュニア',
+                isMe: false,
+                lastLoginAt: Date.now() - 3 * 60 * 60 * 1000,
+                loginCount: 12
+            },
+            {
+                id: 'member_ryota',
+                name: 'りょうた（小学5年・キャッチャー）',
+                team: 'ウエストジュニア',
+                isMe: false,
+                lastLoginAt: Date.now() - 26 * 60 * 60 * 1000,
+                loginCount: 9
+            },
+            {
+                id: 'member_sou',
+                name: 'そうた（小学4年・センター）',
+                team: 'ウエストジュニア',
+                isMe: false,
+                lastLoginAt: null,
+                loginCount: 0
+            }
+        ];
+
+        let memberLogins = safeJsonParse(safeStorageGet('westgym_v4_member_logins'), defaultMemberLogins);
+        if (!Array.isArray(memberLogins) || memberLogins.length === 0) {
+            memberLogins = defaultMemberLogins;
+        }
+
+        function getFormattedPlayerLabel() {
+            const extras = [playerGrade, playerPosition].filter(Boolean);
+            const extraText = extras.length > 0 ? `（${extras.join('・')}）` : '';
+            return `${playerName}${extraText}`;
+        }
+
+        function formatLoginDateTime(ts) {
+            if (!ts) return '未ログイン';
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) return '未ログイン';
+            const now = new Date();
+            const isToday = d.getFullYear() === now.getFullYear() &&
+                            d.getMonth() === now.getMonth() &&
+                            d.getDate() === now.getDate();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            if (isToday) {
+                return `今日 ${hh}:${mm}`;
+            }
+            return `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`;
+        }
+
+        function getLoginStatusBadge(ts) {
+            if (!ts) {
+                return {
+                    label: '未ログイン',
+                    dotClass: 'bg-slate-500',
+                    badgeClass: 'bg-slate-800 text-slate-400 border-slate-700'
+                };
+            }
+            const diffMin = Math.floor((Date.now() - ts) / 60000);
+            if (diffMin <= 30) {
+                return {
+                    label: 'ログイン中',
+                    dotClass: 'bg-emerald-400 animate-pulse',
+                    badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                };
+            }
+            if (diffMin <= 24 * 60) {
+                return {
+                    label: '今日ログイン済',
+                    dotClass: 'bg-sky-400',
+                    badgeClass: 'bg-sky-500/15 text-sky-300 border-sky-500/40'
+                };
+            }
+            return {
+                label: 'オフライン',
+                dotClass: 'bg-amber-400',
+                badgeClass: 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+            };
+        }
+
+        function recordCurrentUserLogin() {
+            const nowTs = Date.now();
+            const myDisplayName = getFormattedPlayerLabel();
+            let me = memberLogins.find(m => m.isMe);
+            if (!me) {
+                me = {
+                    id: 'member_me',
+                    name: myDisplayName,
+                    team: teamName || '',
+                    isMe: true,
+                    lastLoginAt: nowTs,
+                    loginCount: 1
+                };
+                memberLogins.unshift(me);
+            } else {
+                me.name = myDisplayName;
+                me.team = teamName || '';
+                me.lastLoginAt = nowTs;
+                me.loginCount = (me.loginCount || 0) + 1;
+            }
+            safeStorageSet('westgym_v4_member_logins', JSON.stringify(memberLogins));
+            renderMemberLogins();
+        }
+
+        function renderMemberLogins() {
+            const listEl = document.getElementById('member-login-list');
+            const countEl = document.getElementById('member-login-count');
+            if (!listEl) return;
+
+            const myDisplayName = getFormattedPlayerLabel();
+            const sorted = [...memberLogins].map(m => {
+                if (m.isMe) {
+                    return { ...m, name: myDisplayName, team: teamName || '' };
+                }
+                return m;
+            }).sort((a, b) => {
+                if (a.isMe) return -1;
+                if (b.isMe) return 1;
+                if (!a.lastLoginAt && !b.lastLoginAt) return 0;
+                if (!a.lastLoginAt) return 1;
+                if (!b.lastLoginAt) return -1;
+                return b.lastLoginAt - a.lastLoginAt;
+            });
+
+            const loggedInCount = sorted.filter(m => Boolean(m.lastLoginAt)).length;
+            if (countEl) countEl.textContent = `${loggedInCount} / ${sorted.length}人ログイン済`;
+
+            listEl.innerHTML = sorted.map(m => {
+                const st = getLoginStatusBadge(m.lastLoginAt);
+                const subInfo = m.team ? `${escapeHTML(m.team)}・` : '';
+                const countLabel = m.loginCount ? `ログイン${m.loginCount}回` : '未ログイン';
+                return `
+                    <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl border ${m.isMe ? 'bg-emerald-950/40 border-emerald-500/40' : 'bg-slate-950/65 border-slate-800'}">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full ${st.dotClass} shrink-0"></span>
+                            <div class="min-w-0">
+                                <div class="text-xs font-black text-white truncate flex items-center gap-1.5">
+                                    <span class="truncate">${escapeHTML(m.name)}</span>
+                                    ${m.isMe ? '<span class="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded shrink-0">自分</span>' : ''}
+                                </div>
+                                <div class="text-[10px] text-slate-400 truncate mt-0.5">
+                                    ${subInfo}最終: <span class="text-slate-200 font-bold">${escapeHTML(formatLoginDateTime(m.lastLoginAt))}</span>（${countLabel}）
+                                </div>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-black px-2 py-1 rounded-lg border shrink-0 ${st.badgeClass}">
+                            ${escapeHTML(st.label)}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        const badgeDefinitions = [
+            { id: 'first_step', name: 'はじめの一歩', desc: '練習メニューを1つ100%達成', icon: 'fa-shoe-prints', color: 'text-emerald-400' },
+            { id: 'perfect_day', name: 'パーフェクト達成', desc: '今日の達成率100%をクリア', icon: 'fa-crown', color: 'text-amber-400' },
+            { id: 'swing_100', name: '素振りマスター', desc: '素振りを100回以上達成', icon: 'fa-baseball-bat-ball', color: 'text-sky-400' },
+            { id: 'note_keeper', name: '野球ノート名人', desc: '野球ノートを3回以上記録', icon: 'fa-book-open', color: 'text-purple-400' },
+            { id: 'body_builder', name: '体づくりチェック', desc: '身長・体重を初めて記録', icon: 'fa-ruler-combined', color: 'text-cyan-400' },
+            { id: 'goal_crusher', name: '目標クリア！', desc: '今週または今月の目標を達成', icon: 'fa-bullseye', color: 'text-rose-400' },
+            { id: 'regular_lv6', name: '努力の天才', desc: 'レベル Lv.5 に到達', icon: 'fa-star', color: 'text-yellow-400' },
+            { id: 'koshien_lv15', name: '全国大会レベル', desc: 'レベル Lv.15 に到達', icon: 'fa-trophy', color: 'text-amber-300' }
+        ];
+
+        // --- 称号テーブル ---
+        function getTitleInfo(lv) {
+            if (lv >= 20) return { current: 'プロ野球選手レベル', next: '野球界のレジェンド' };
+            if (lv >= 15) return { current: '全国大会レベル', next: 'プロ野球選手レベル' };
+            if (lv >= 10) return { current: '県大会ベスト8', next: '全国大会レベル' };
+            if (lv >= 6) return { current: 'チームのレギュラー', next: '県大会ベスト8' };
+            if (lv >= 5) return { current: '努力の天才', next: 'チームのレギュラー' };
+            if (lv >= 4) return { current: '熱血チャレンジャー', next: '努力の天才' };
+            return { current: 'ベンチ入り候補', next: '熱血チャレンジャー' };
+        }
+
+        // --- トースト ---
+        let toastTimer = null;
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-msg');
+            if (!toast || !msgEl) return;
+            msgEl.textContent = msg;
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 2500);
+        }
+
+        // --- ステータスヘッダー更新 ---
+        function updateHeaderStats() {
+            const nextReq = 1000;
+            const remain = Math.max(0, nextReq - playerStats.exp);
+            const pct = Math.min(100, Math.round((playerStats.exp / nextReq) * 100));
+            const titles = getTitleInfo(playerStats.level);
+
+            const elLv = document.getElementById('player-level');
+            const elRemain = document.getElementById('remain-exp');
+            const elBar = document.getElementById('exp-bar');
+            const elTitle = document.getElementById('player-title');
+            const elNextTitle = document.getElementById('next-title-name');
+            const elNextPt = document.getElementById('next-title-pt');
+            const elPts = document.getElementById('total-points-display');
+            const elStreak = document.getElementById('streak-days');
+
+            if (elLv) elLv.textContent = playerStats.level;
+            if (elRemain) elRemain.textContent = remain;
+            if (elBar) elBar.style.width = `${pct}%`;
+            if (elTitle) elTitle.textContent = titles.current;
+            if (elNextTitle) elNextTitle.textContent = titles.next;
+            if (elNextPt) elNextPt.textContent = remain;
+            if (elPts) elPts.textContent = Number(playerStats.points || 0).toLocaleString();
+            if (elStreak) elStreak.textContent = playerStats.streak || 0;
+        }
+
+        function addPoints(pt, reason = '') {
+            playerStats.points = (playerStats.points || 0) + pt;
+            playerStats.exp = (playerStats.exp || 0) + pt;
+            let leveledUp = false;
+            while (playerStats.exp >= 1000) {
+                playerStats.exp -= 1000;
+                playerStats.level += 1;
+                leveledUp = true;
+            }
+            safeStorageSet('westgym_v4_stats', JSON.stringify(playerStats));
+            updateHeaderStats();
+            checkAndUnlockBadges();
+            renderLeaderboard();
+
+            if (leveledUp) {
+                const t = getTitleInfo(playerStats.level);
+                playSuccessSound();
+                showToast(`レベルアップ！Lv.${playerStats.level}「${t.current}」に昇格！`);
+            } else if (reason) {
+                showToast(`${reason} (+${pt}pt)`);
+            }
+        }
+
+        // --- 今日の達成率リング＆今日の練習カード描画 ---
+        function saveDrills() {
+            safeStorageSet('westgym_v4_drills', JSON.stringify(drills));
+        }
+
+        function quickAddDrill(event, id, step) {
+            if (event) event.stopPropagation();
+            const drill = drills.find(d => d.id === id);
+            if (!drill) return;
+            const wasDone = drill.current >= drill.target;
+            drill.current += step;
+            saveDrills();
+            renderTodayDashboard();
+            if (!wasDone && drill.current >= drill.target) {
+                playSuccessSound();
+                addPoints(30, `${drill.name} 目標達成！`);
+            } else {
+                playPopSound();
+                addPoints(step, `${drill.name} +${step}${drill.unit}`);
+            }
+        }
+
+        function renderTodayDashboard() {
+            const totalItems = drills.length;
+            const completedCount = drills.filter(d => d.current >= d.target).length;
+            const overallPct = totalItems === 0 ? 0 : Math.round((completedCount / totalItems) * 100);
+
+            const ringCircle = document.getElementById('ring-progress-circle');
+            const ringNum = document.getElementById('ring-percent-num');
+            if (ringNum) ringNum.textContent = overallPct;
+            if (ringCircle) {
+                const circumference = 314.16;
+                ringCircle.style.strokeDashoffset = String(circumference - (circumference * Math.min(100, overallPct)) / 100);
+                ringCircle.style.stroke = overallPct >= 100 ? '#22c55e' : '#38bdf8';
+            }
+
+            const checkGrid = document.getElementById('summary-check-grid');
+            if (checkGrid) {
+                checkGrid.innerHTML = drills.slice(0, 6).map(d => {
+                    const isDone = d.current >= d.target;
+                    return `
+                        <div class="flex items-center gap-1.5 truncate">
+                            <span class="w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${isDone ? 'bg-emerald-500 text-white' : 'bg-slate-800 border border-slate-600 text-transparent'} text-[10px]">
+                                <i class="fa-solid fa-check"></i>
+                            </span>
+                            <span class="truncate ${isDone ? 'text-white' : 'text-slate-400'}">${escapeHTML(d.name)}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const listEl = document.getElementById('today-drills-list');
+            if (listEl) {
+                listEl.innerHTML = drills.map(d => {
+                    const pct = d.target > 0 ? Math.round((d.current / d.target) * 100) : 0;
+                    const barWidth = Math.min(100, pct);
+                    const quickStep = d.target >= 50 ? 10 : (d.target >= 15 ? 5 : 1);
+                    return `
+                        <div onclick="openDrillModal('${escapeHTML(d.id)}')" class="cursor-pointer hover:bg-slate-50 px-3.5 py-2.5 flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-lg bg-sky-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
+                                <i class="fa-solid ${escapeHTML(d.icon || 'fa-dumbbell')}"></i>
+                            </div>
+                            <div class="w-16 text-xs font-black text-slate-800 truncate shrink-0">
+                                ${escapeHTML(d.name)}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between text-[11px] font-extrabold text-slate-600 mb-1">
+                                    <span><strong class="text-slate-900">${d.current}</strong> / ${d.target}${escapeHTML(d.unit)}</span>
+                                    <span class="font-black text-slate-800">${pct}%</span>
+                                </div>
+                                <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full ${pct >= 100 ? 'bg-emerald-500' : 'bg-blue-500'} transition-all duration-300" style="width: ${barWidth}%"></div>
+                                </div>
+                            </div>
+                            <button type="button" onclick="quickAddDrill(event, '${escapeHTML(d.id)}', ${quickStep})" class="btn-press bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-2.5 py-1.5 rounded-lg shadow-sm shrink-0">
+                                +${quickStep}
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        // --- 種目詳細＆記録モーダル（説明のみ） ---
+        function openDrillModal(id) {
+            const drill = drills.find(d => d.id === id);
+            if (!drill) return;
+            activeDrillId = id;
+            const modal = document.getElementById('drill-modal');
+            if (!modal) return;
+            updateDrillModalUI(drill);
+            modal.classList.remove('hidden');
+            playPopSound();
+        }
+
+        function updateDrillModalUI(drill) {
+            const pct = drill.target > 0 ? Math.round((drill.current / drill.target) * 100) : 0;
+            const titleEl = document.getElementById('drill-modal-title');
+            const progEl = document.getElementById('drill-modal-progress-label');
+            const descEl = document.getElementById('drill-modal-desc');
+            const targetInput = document.getElementById('drill-target-input');
+            const unitLabel = document.getElementById('drill-unit-label');
+
+            if (titleEl) titleEl.textContent = drill.name;
+            if (progEl) progEl.textContent = `${drill.current} / ${drill.target}${drill.unit} (${pct}%)`;
+            if (descEl) descEl.textContent = drill.desc || '正しいフォームで1回ずつ丁寧にやろう！';
+            if (targetInput) targetInput.value = drill.target;
+            if (unitLabel) unitLabel.textContent = drill.unit;
+        }
+
+        function closeDrillModal() {
+            const modal = document.getElementById('drill-modal');
+            if (modal) modal.classList.add('hidden');
+            activeDrillId = null;
+        }
+
+        function incrementActiveDrill(delta) {
+            const drill = drills.find(d => d.id === activeDrillId);
+            if (!drill) return;
+            const wasDone = drill.current >= drill.target;
+            drill.current = Math.max(0, drill.current + delta);
+
+            saveDrills();
+            renderTodayDashboard();
+            updateDrillModalUI(drill);
+
+            const isNowDone = drill.current >= drill.target;
+            if (!wasDone && isNowDone) {
+                playSuccessSound();
+                addPoints(30, `${drill.name} 目標達成！`);
+            } else {
+                playPopSound();
+                addPoints(delta, `${drill.name} +${delta}${drill.unit}`);
+            }
+        }
+
+        function saveDrillTarget() {
+            const drill = drills.find(d => d.id === activeDrillId);
+            const val = parseInt(document.getElementById('drill-target-input')?.value || '0', 10);
+            if (!drill || isNaN(val) || val < 1) return;
+            drill.target = val;
+            saveDrills();
+            renderTodayDashboard();
+            updateDrillModalUI(drill);
+            playPopSound();
+            showToast('目標の回数を変更しました');
+        }
+
+        function resetSingleDrill() {
+            const drill = drills.find(d => d.id === activeDrillId);
+            if (!drill) return;
+            drill.current = 0;
+            saveDrills();
+            renderTodayDashboard();
+            updateDrillModalUI(drill);
+            playPopSound();
+        }
+
+        function resetDailyDrills() {
+            drills.forEach(d => { d.current = 0; });
+            saveDrills();
+            renderTodayDashboard();
+            playPopSound();
+            showToast('今日の練習を0に戻しました');
+        }
+
+        // --- 新規種目追加 ---
+        function openAddDrillModal() {
+            const m = document.getElementById('add-drill-modal');
+            if (m) m.classList.remove('hidden');
+        }
+        function closeAddDrillModal() {
+            const m = document.getElementById('add-drill-modal');
+            if (m) m.classList.add('hidden');
+        }
+        const addDrillForm = document.getElementById('add-drill-form');
+        if (addDrillForm) {
+            addDrillForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('new-drill-name')?.value.trim();
+                const target = parseInt(document.getElementById('new-drill-target')?.value || '10', 10);
+                const unit = document.getElementById('new-drill-unit')?.value || '回';
+                const category = document.getElementById('new-drill-cat')?.value || '打撃';
+                if (!name) return;
+
+                const iconMap = {
+                    '打撃': 'fa-baseball-bat-ball',
+                    '投球': 'fa-baseball',
+                    '守備・走塁': 'fa-person-running',
+                    'フィジカル': 'fa-dumbbell'
+                };
+                drills.push({
+                    id: 'custom_' + Date.now(),
+                    name,
+                    current: 0,
+                    target: Math.max(1, target),
+                    unit,
+                    category,
+                    icon: iconMap[category] || 'fa-dumbbell',
+                    desc: 'フォームを意識して、1回ずつ丁寧に目標達成を目指そう！'
+                });
+                saveDrills();
+                renderTodayDashboard();
+                closeAddDrillModal();
+                addDrillForm.reset();
+                playSuccessSound();
+                showToast(`「${name}」を追加しました`);
+            });
+        }
+
+        // --- タブ切り替え（3タブ） ---
+        function switchTab(tabName) {
+            const sections = ['menu', 'log', 'social'];
+            sections.forEach(name => {
+                const sec = document.getElementById(`section-${name}`);
+                const btn = document.getElementById(`tab-${name}`);
+                if (sec) sec.classList.toggle('hidden', name !== tabName);
+                if (btn) {
+                    btn.className = name === tabName
+                        ? 'tab-btn text-emerald-400 flex flex-col items-center justify-center text-xs font-black'
+                        : 'tab-btn text-slate-400 flex flex-col items-center justify-center text-xs font-bold';
+                }
+            });
+            playPopSound();
+        }
+
+        // --- インターバルタイマー ---
+        let timerInterval = null;
+        let timerRunning = false;
+        let timerSecondsLeft = 30;
+        let timerCurrentSet = 1;
+        let timerIsRest = false;
+
+        function formatSec(sec) {
+            const m = String(Math.floor(sec / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateTimerUI() {
+            const totalSets = Math.max(1, parseInt(document.getElementById('total-sets')?.value || '3', 10));
+            const disp = document.getElementById('timer-display');
+            const setInfo = document.getElementById('timer-set-info');
+            const phaseEl = document.getElementById('timer-phase');
+            const startBtn = document.getElementById('timer-start-btn');
+            if (disp) disp.textContent = formatSec(timerSecondsLeft);
+            if (setInfo) setInfo.textContent = `${timerCurrentSet} / ${totalSets}セット（30秒運動・15秒休憩）`;
+            if (phaseEl) {
+                phaseEl.textContent = !timerRunning ? '準備OK' : (timerIsRest ? '休憩中' : '運動中！');
+            }
+            if (startBtn) {
+                startBtn.textContent = timerRunning ? '一時停止' : 'スタート';
+            }
+        }
+
+        function resetTimer() {
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+            timerRunning = false;
+            timerIsRest = false;
+            timerCurrentSet = 1;
+            timerSecondsLeft = Math.max(5, parseInt(document.getElementById('work-sec')?.value || '30', 10));
+            updateTimerUI();
+        }
+
+        function toggleTimer() {
+            if (timerRunning) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                timerRunning = false;
+                updateTimerUI();
+                return;
+            }
+            timerRunning = true;
+            playBeep(true);
+            updateTimerUI();
+            timerInterval = setInterval(() => {
+                const workSec = Math.max(5, parseInt(document.getElementById('work-sec')?.value || '30', 10));
+                const restSec = Math.max(5, parseInt(document.getElementById('rest-sec')?.value || '15', 10));
+                const totalSets = Math.max(1, parseInt(document.getElementById('total-sets')?.value || '3', 10));
+
+                if (timerSecondsLeft > 1) {
+                    timerSecondsLeft -= 1;
+                    if (timerSecondsLeft <= 3) playBeep(false);
+                    updateTimerUI();
+                    return;
+                }
+                if (!timerIsRest) {
+                    if (timerCurrentSet >= totalSets) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                        timerRunning = false;
+                        timerSecondsLeft = 0;
+                        updateTimerUI();
+                        const plankDrill = drills.find(d => d.id === 'plank');
+                        if (plankDrill) {
+                            plankDrill.current += workSec * totalSets;
+                            saveDrills();
+                            renderTodayDashboard();
+                        }
+                        playSuccessSound();
+                        addPoints(30, 'タイマー3セット完了！');
+                        setTimeout(resetTimer, 1500);
+                    } else {
+                        timerIsRest = true;
+                        timerSecondsLeft = restSec;
+                        playBeep(false);
+                        updateTimerUI();
+                    }
+                } else {
+                    timerIsRest = false;
+                    timerCurrentSet += 1;
+                    timerSecondsLeft = workSec;
+                    playBeep(true);
+                    updateTimerUI();
+                }
+            }, 1000);
+        }
+
+        // --- 身長・体重記録 ---
+        function renderBodyRecords() {
+            const list = document.getElementById('body-history-list');
+            const summary = document.getElementById('body-latest-summary');
+            if (!list || !summary) return;
+            if (!Array.isArray(bodyRecords) || bodyRecords.length === 0) {
+                summary.textContent = '未記録';
+                list.innerHTML = '<p class="text-xs text-slate-500">身長・体重を入力して体の成長を記録しよう。</p>';
+                return;
+            }
+            const latest = bodyRecords[0];
+            summary.textContent = `${latest.height}cm / ${latest.weight}kg`;
+            list.innerHTML = bodyRecords.slice(0, 6).map((rec, idx) => {
+                const prev = bodyRecords[idx + 1];
+                let diffText = '';
+                if (prev) {
+                    const hDiff = (rec.height - prev.height).toFixed(1);
+                    const wDiff = (rec.weight - prev.weight).toFixed(1);
+                    diffText = `<span class="text-[10px] text-slate-400 ml-1.5">(${Number(hDiff) >= 0 ? '+' : ''}${hDiff}cm / ${Number(wDiff) >= 0 ? '+' : ''}${wDiff}kg)</span>`;
+                }
+                return `
+                    <div class="flex items-center justify-between bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-1.5 text-xs">
+                        <div>
+                            <span class="font-bold text-slate-400 mr-2">${escapeHTML(rec.date)}</span>
+                            <span class="font-black text-white">${rec.height}cm / ${rec.weight}kg</span>${diffText}
+                        </div>
+                        <button type="button" onclick="deleteBodyRecord(${rec.id})" class="text-slate-600 hover:text-rose-400"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function deleteBodyRecord(id) {
+            bodyRecords = bodyRecords.filter(r => r.id !== id);
+            safeStorageSet('westgym_v4_body_records', JSON.stringify(bodyRecords));
+            renderBodyRecords();
+        }
+
+        const bodyForm = document.getElementById('body-form');
+        if (bodyForm) {
+            bodyForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const h = parseFloat(document.getElementById('body-height')?.value);
+                const w = parseFloat(document.getElementById('body-weight')?.value);
+                if (!Number.isFinite(h) || h < 80 || h > 230 || !Number.isFinite(w) || w < 15 || w > 180) {
+                    showToast('正しい身長と体重を入力してください');
+                    return;
+                }
+                const dateStr = new Date().toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+                bodyRecords.unshift({ id: Date.now(), date: dateStr, height: Number(h.toFixed(1)), weight: Number(w.toFixed(1)) });
+                safeStorageSet('westgym_v4_body_records', JSON.stringify(bodyRecords));
+                renderBodyRecords();
+                playSuccessSound();
+                addPoints(15, '身長・体重を記録しました！');
+            });
+        }
+
+        // --- 野球ノート ---
+        function renderLogs() {
+            const list = document.getElementById('log-list');
+            if (!list) return;
+            if (logs.length === 0) {
+                list.innerHTML = '<p class="text-center text-xs text-slate-500 py-3">まだ野球ノートの記録がありません。</p>';
+                return;
+            }
+            list.innerHTML = logs.map(log => `
+                <div class="bg-[#0e2238]/95 border border-slate-700/80 rounded-2xl p-3.5 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-400">${escapeHTML(log.date)}</span>
+                            <span class="text-[10px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">${escapeHTML(log.condition)}</span>
+                        </div>
+                        <button type="button" onclick="deleteLog(${log.id})" class="text-slate-600 hover:text-rose-400 text-xs"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <p class="text-xs text-slate-200 whitespace-pre-line leading-relaxed">${escapeHTML(log.note)}</p>
+                </div>
+            `).join('');
+        }
+
+        function deleteLog(id) {
+            logs = logs.filter(l => l.id !== id);
+            safeStorageSet('westgym_v4_logs', JSON.stringify(logs));
+            renderLogs();
+        }
+
+        const logForm = document.getElementById('log-form');
+        if (logForm) {
+            logForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const cond = document.getElementById('log-condition')?.value || '元気いっぱい';
+                const noteEl = document.getElementById('log-note');
+                const note = noteEl ? noteEl.value.trim() : '';
+                if (!note) return;
+                const dateStr = new Date().toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' });
+                logs.unshift({ id: Date.now(), date: dateStr, condition: cond, note });
+                safeStorageSet('westgym_v4_logs', JSON.stringify(logs));
+                renderLogs();
+                if (noteEl) noteEl.value = '';
+                playSuccessSound();
+                addPoints(20, '野球ノートを保存しました！');
+            });
+        }
+
+        // --- 今週・今月の目標 ---
+        function renderPeriodGoals() {
+            ['weekly', 'monthly'].forEach(period => {
+                const goal = periodGoals[period] || { text: '', completed: false };
+                const input = document.getElementById(`${period}-goal-input`);
+                const btn = document.getElementById(`${period}-goal-check`);
+                if (input && document.activeElement !== input) input.value = goal.text || '';
+                if (btn) {
+                    btn.textContent = goal.completed ? '達成！' : '未達成';
+                    btn.className = goal.completed
+                        ? 'text-xs font-bold px-2.5 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400 text-emerald-300'
+                        : 'text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-300';
+                }
+            });
+        }
+
+        function savePeriodGoal(period) {
+            const text = document.getElementById(`${period}-goal-input`)?.value.trim() || '';
+            if (!text) { showToast('目標を入力してください'); return; }
+            periodGoals[period] = { text, completed: false };
+            safeStorageSet('westgym_v4_period_goals', JSON.stringify(periodGoals));
+            renderPeriodGoals();
+            playPopSound();
+            showToast('目標を保存しました！');
+        }
+
+        function togglePeriodGoal(period) {
+            const goal = periodGoals[period];
+            if (!goal || !goal.text) { showToast('先に目標を保存してください'); return; }
+            goal.completed = !goal.completed;
+            safeStorageSet('westgym_v4_period_goals', JSON.stringify(periodGoals));
+            renderPeriodGoals();
+            if (goal.completed) {
+                playSuccessSound();
+                addPoints(50, '目標クリアおめでとう！');
+            }
+        }
+
+        // --- プロフィールアイコン（写真・カメラ） ---
+        function applyAvatarUI() {
+            [
+                { img: 'header-avatar-img', icon: 'header-avatar-icon' },
+                { img: 'modal-avatar-preview', icon: 'modal-avatar-icon' }
+            ].forEach(p => {
+                const imgEl = document.getElementById(p.img);
+                const iconEl = document.getElementById(p.icon);
+                if (!imgEl || !iconEl) return;
+                if (playerAvatar) {
+                    imgEl.src = playerAvatar;
+                    imgEl.classList.remove('hidden');
+                    iconEl.classList.add('hidden');
+                } else {
+                    imgEl.src = '';
+                    imgEl.classList.add('hidden');
+                    iconEl.classList.remove('hidden');
+                }
+            });
+        }
+
+        function openAvatarModal() {
+            applyAvatarUI();
+            document.getElementById('avatar-modal')?.classList.remove('hidden');
+        }
+        function closeAvatarModal() {
+            document.getElementById('avatar-modal')?.classList.add('hidden');
+        }
+
+        function handleAvatarFileSelect(event) {
+            const file = event.target?.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 160;
+                    canvas.height = 160;
+                    const ctx = canvas.getContext('2d');
+                    const minSide = Math.min(img.width, img.height);
+                    ctx.drawImage(img, (img.width - minSide) / 2, (img.height - minSide) / 2, minSide, minSide, 0, 0, 160, 160);
+                    playerAvatar = canvas.toDataURL('image/jpeg', 0.82);
+                    safeStorageSet('westgym_v4_player_avatar', playerAvatar);
+                    applyAvatarUI();
+                    renderLeaderboard();
+                    playSuccessSound();
+                    showToast('アイコン写真を設定しました！');
+                    closeAvatarModal();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        }
+
+        function resetAvatarPhoto() {
+            playerAvatar = '';
+            safeStorageSet('westgym_v4_player_avatar', '');
+            applyAvatarUI();
+            renderLeaderboard();
+            closeAvatarModal();
+        }
+
+        // --- 実績バッジ ---
+        function checkAndUnlockBadges() {
+            if (!Array.isArray(unlockedBadges)) unlockedBadges = [];
+            const allDone = drills.length > 0 && drills.every(d => d.current >= d.target);
+            const anyDone = drills.some(d => d.current >= d.target);
+            const swingDrill = drills.find(d => d.id === 'swing');
+            const conditions = {
+                first_step: anyDone,
+                perfect_day: allDone,
+                swing_100: Boolean(swingDrill && swingDrill.current >= 100),
+                note_keeper: logs.length >= 3,
+                body_builder: bodyRecords.length >= 1,
+                goal_crusher: Boolean(periodGoals.weekly?.completed || periodGoals.monthly?.completed),
+                regular_lv6: playerStats.level >= 5,
+                koshien_lv15: playerStats.level >= 15
+            };
+            badgeDefinitions.forEach(b => {
+                if (conditions[b.id] && !unlockedBadges.includes(b.id)) {
+                    unlockedBadges.push(b.id);
+                    safeStorageSet('westgym_v4_badges', JSON.stringify(unlockedBadges));
+                    showToast(`バッジ獲得！「${b.name}」`);
+                }
+            });
+            renderBadges();
+        }
+
+        function renderBadges() {
+            const grid = document.getElementById('badge-grid');
+            const countEl = document.getElementById('badge-count-display');
+            if (!grid) return;
+            const set = new Set(unlockedBadges);
+            if (countEl) countEl.textContent = `${set.size} / ${badgeDefinitions.length}`;
+            grid.innerHTML = badgeDefinitions.map(b => {
+                const ok = set.has(b.id);
+                return `
+                    <div class="rounded-xl p-2 border text-center space-y-1 ${ok ? 'bg-slate-950/90 border-amber-500/40' : 'bg-slate-950/40 border-slate-800 opacity-50'}">
+                        <div class="w-8 h-8 mx-auto rounded-lg flex items-center justify-center text-base ${ok ? 'bg-slate-900 ' + b.color : 'bg-slate-900 text-slate-600'}">
+                            <i class="fa-solid ${ok ? b.icon : 'fa-lock'}"></i>
+                        </div>
+                        <div class="text-[10px] font-black text-white leading-tight">${escapeHTML(b.name)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- プロフィール＆ランキング・共有 ---
+        function updateProfileUI() {
+            const hName = document.getElementById('header-player-name');
+            const hGradePos = document.getElementById('header-grade-pos-badge');
+            const hTeam = document.getElementById('header-team-badge');
+            const nIn = document.getElementById('player-name-input');
+            const tIn = document.getElementById('team-name-input');
+            const gSel = document.getElementById('player-grade-select');
+            const pSel = document.getElementById('player-position-select');
+
+            if (hName) hName.textContent = playerName;
+            if (hGradePos) {
+                const info = [playerGrade, playerPosition].filter(Boolean).join('・');
+                if (info) {
+                    hGradePos.textContent = info;
+                    hGradePos.classList.remove('hidden');
+                } else {
+                    hGradePos.textContent = '';
+                    hGradePos.classList.add('hidden');
+                }
+            }
+            if (hTeam) {
+                if (teamName) { hTeam.textContent = teamName; hTeam.classList.remove('hidden'); }
+                else { hTeam.textContent = ''; hTeam.classList.add('hidden'); }
+            }
+            if (nIn && document.activeElement !== nIn) nIn.value = playerName;
+            if (tIn && document.activeElement !== tIn) tIn.value = teamName;
+            if (gSel && document.activeElement !== gSel) gSel.value = playerGrade;
+            if (pSel && document.activeElement !== pSel) pSel.value = playerPosition;
+        }
+
+        function savePlayerProfile() {
+            const newName = document.getElementById('player-name-input')?.value.trim() || '';
+            const newTeam = document.getElementById('team-name-input')?.value.trim() || '';
+            const newGrade = document.getElementById('player-grade-select')?.value || '';
+            const newPos = document.getElementById('player-position-select')?.value || '';
+
+            if (newName) { playerName = newName; safeStorageSet('westgym_v4_player_name', playerName); }
+            teamName = newTeam;
+            playerGrade = newGrade;
+            playerPosition = newPos;
+
+            safeStorageSet('westgym_v4_team_name', teamName);
+            safeStorageSet('westgym_v4_player_grade', playerGrade);
+            safeStorageSet('westgym_v4_player_position', playerPosition);
+
+            updateProfileUI();
+            renderLeaderboard();
+            renderMemberLogins();
+            playSuccessSound();
+            showToast('プロフィールを保存しました！');
+        }
+
+        function renderLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            if (!list) return;
+            const baseLabel = getFormattedPlayerLabel();
+            const myLabel = teamName ? `${baseLabel} / ${teamName}` : `${baseLabel}（自分）`;
+            const players = [
+                { name: 'はると（小学6年・ピッチャー / ウエストジュニア）', level: 16, exp: 420, isMe: false },
+                { name: 'けんと（小学5年・ショート / ウエストジュニア）', level: 11, exp: 210, isMe: false },
+                { name: 'りょうた（小学5年・キャッチャー / ウエストジュニア）', level: 8, exp: 150, isMe: false },
+                { name: myLabel, level: playerStats.level, exp: playerStats.exp, isMe: true },
+                { name: 'そうた（小学4年・センター / ウエストジュニア）', level: 3, exp: 90, isMe: false }
+            ].sort((a, b) => (b.level * 1000 + b.exp) - (a.level * 1000 + a.exp));
+
+            list.innerHTML = players.map((p, idx) => {
+                const badge = idx === 0 ? 'bg-amber-400 text-slate-950' : idx === 1 ? 'bg-slate-300 text-slate-950' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400';
+                const avatar = p.isMe && playerAvatar
+                    ? `<img src="${playerAvatar}" alt="" class="w-7 h-7 rounded-lg object-cover border border-amber-400/50 shrink-0">`
+                    : `<div class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 text-xs shrink-0"><i class="fa-solid fa-user"></i></div>`;
+                return `
+                    <div class="flex items-center justify-between p-2.5 rounded-xl border ${p.isMe ? 'bg-emerald-950/50 border-emerald-500/50' : 'bg-slate-950/60 border-slate-800'}">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="w-6 h-6 rounded-lg ${badge} font-black text-xs flex items-center justify-center shrink-0">${idx + 1}</span>
+                            ${avatar}
+                            <div class="min-w-0">
+                                <div class="text-xs font-extrabold text-white truncate">${escapeHTML(p.name)}</div>
+                                <div class="text-[10px] font-bold text-amber-400">${escapeHTML(getTitleInfo(p.level).current)}</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-black bg-slate-800 text-emerald-400 px-2 py-1 rounded-lg border border-slate-700 shrink-0">Lv.${p.level}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function fillShareFromToday() {
+            const summary = drills.map(d => `${d.name}${d.current}${d.unit}`).join('・');
+            const ta = document.getElementById('share-text-input');
+            if (ta) ta.value = `【WESTGYM今日の練習】${summary} を頑張ったよ！`;
+            playPopSound();
+        }
+
+        function submitSharedPost() {
+            const ta = document.getElementById('share-text-input');
+            const text = ta ? ta.value.trim() : '';
+            if (!text) { showToast('投稿する内容を入力してください'); return; }
+            const baseLabel = getFormattedPlayerLabel();
+            const author = teamName ? `${baseLabel} / ${teamName}` : baseLabel;
+            sharedPosts.unshift({
+                id: Date.now(),
+                author,
+                title: getTitleInfo(playerStats.level).current,
+                text,
+                time: 'たった今',
+                likes: 0,
+                liked: false
+            });
+            safeStorageSet('westgym_v4_shared_posts', JSON.stringify(sharedPosts));
+            if (ta) ta.value = '';
+            renderSharedFeed();
+            playSuccessSound();
+            addPoints(10, 'みんなに共有しました！');
+        }
+
+        function toggleLikePost(id) {
+            const post = sharedPosts.find(p => p.id === id);
+            if (!post) return;
+            post.liked = !post.liked;
+            post.likes += post.liked ? 1 : -1;
+            safeStorageSet('westgym_v4_shared_posts', JSON.stringify(sharedPosts));
+            renderSharedFeed();
+            playPopSound();
+        }
+
+        function renderSharedFeed() {
+            const feed = document.getElementById('shared-feed-list');
+            if (!feed) return;
+            feed.innerHTML = sharedPosts.map(post => `
+                <div class="bg-slate-950/75 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="text-xs font-black text-white truncate">${escapeHTML(post.author)}</span>
+                            <span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">${escapeHTML(post.title)}</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 shrink-0">${escapeHTML(post.time)}</span>
+                    </div>
+                    <p class="text-xs text-slate-200 leading-relaxed whitespace-pre-line">${escapeHTML(post.text)}</p>
+                    <div class="flex justify-end">
+                        <button type="button" onclick="toggleLikePost(${post.id})" class="text-[11px] font-bold px-2 py-0.5 rounded-lg border ${post.liked ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300' : 'bg-slate-900 border-slate-700 text-slate-400'}">
+                            <i class="fa-solid fa-thumbs-up"></i> ナイス！ (${post.likes})
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- 初期化 ---
+        function initApp() {
+            const dateChip = document.getElementById('top-date-chip');
+            if (dateChip) {
+                const now = new Date();
+                const w = ['日', '月', '火', '水', '木', '金', '土'][now.getDay()];
+                dateChip.textContent = `${now.getMonth() + 1}月${now.getDate()}日(${w})`;
+            }
+            const overlay = document.getElementById('passcode-overlay');
+            const isUnlocked = !overlay || overlay.classList.contains('hidden');
+            if (isUnlocked) {
+                recordCurrentUserLogin();
+            } else {
+                renderMemberLogins();
+            }
+            updateProfileUI();
+            applyAvatarUI();
+            updateHeaderStats();
+            renderTodayDashboard();
+            renderPeriodGoals();
+            renderBodyRecords();
+            renderLogs();
+            checkAndUnlockBadges();
+            renderLeaderboard();
+            renderSharedFeed();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+    </script>
+</body>
+</html>
